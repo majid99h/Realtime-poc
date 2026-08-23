@@ -1,0 +1,43 @@
+[
+  {
+    "ContainingType": "TrafficRealtime.Poc.Api.Controllers.BenchmarkController",
+    "Method": "CreateSubscriptions",
+    "RelativePath": "api/benchmark/subscriptions",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "users",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "camerasPerUser",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TrafficRealtime.Poc.Api.Controllers.BenchmarkController",
+    "Method": "GetStatistics",
+    "RelativePath": "api/benchmark/subscriptions",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TrafficRealtime.Poc.Api.Controllers.BenchmarkController",
+    "Method": "Clear",
+    "RelativePath": "api/benchmark/subscriptions",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  }
+]

@@ -1,0 +1,1070 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1" />
+
+    <title>Realtime Architecture Test</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            background: #f5f6f8;
+            color: #1f2937;
+        }
+
+        h1 {
+            margin: 0 0 6px;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.04);
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #9ca3af;
+        }
+
+            .dot.connected {
+                background: #16a34a;
+            }
+
+            .dot.reconnecting {
+                background: #f59e0b;
+            }
+
+            .dot.disconnected {
+                background: #dc2626;
+            }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+            .info-row:last-child {
+                border-bottom: 0;
+            }
+
+        .label {
+            color: #6b7280;
+        }
+
+        button {
+            border: 1px solid #d1d5db;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 4px 4px 4px 0;
+        }
+
+            button:hover {
+                background: #f3f4f6;
+            }
+
+            button.primary {
+                background: #2563eb;
+                color: white;
+                border-color: #2563eb;
+            }
+
+            button.danger {
+                color: #b91c1c;
+            }
+
+            button.channel {
+                min-width: 145px;
+            }
+
+        .channel-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .channel-name {
+            width: 100px;
+            font-weight: 600;
+        }
+
+        .channel-status {
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .stat {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        #events {
+            max-height: 420px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #111827;
+            color: #e5e7eb;
+            padding: 8px;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+        }
+
+        .event {
+            padding: 9px;
+            border-bottom: 1px solid #374151;
+        }
+
+            .event:last-child {
+                border-bottom: 0;
+            }
+
+        .event-header {
+            font-weight: 700;
+        }
+
+        .event-meta {
+            color: #9ca3af;
+            margin-top: 3px;
+        }
+
+        .event-message {
+            margin-top: 4px;
+        }
+
+        .empty {
+            color: #9ca3af;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .actions {
+            margin-top: 12px;
+        }
+
+        .warning {
+            color: #92400e;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 12px;
+        }
+
+        @media(max-width: 700px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Realtime Architecture Test</h1>
+
+    <div class="subtitle">
+        SignalR + RabbitMQ Channel / Camera Subscription PoC
+    </div>
+
+    <div class="grid">
+
+        <!-- CONNECTION -->
+
+        <div class="card">
+
+            <h2>Connection</h2>
+
+            <div class="status">
+                <span id="statusDot" class="dot disconnected"></span>
+                <span id="status">Disconnected</span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">Connection ID</span>
+                <strong id="connectionId">-</strong>
+            </div>
+
+            <div class="info-row">
+                <span class="label">Hub</span>
+                <strong>/hubs/traffic</strong>
+            </div>
+
+            <div class="actions">
+
+                <button class="primary"
+                        onclick="connect()">
+                    Connect
+                </button>
+
+                <button class="danger"
+                        onclick="disconnect()">
+                    Disconnect
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- CAMERA STRESS TEST -->
+
+        <div class="card">
+
+            <h2>Camera Subscription Stress Test</h2>
+
+            <div class="info-row">
+                <span class="label">Current cameras</span>
+                <strong id="cameraCount">0</strong>
+            </div>
+
+            <div class="actions">
+
+                <button onclick="subscribeCameras(1000)">
+                    Subscribe 1000
+                </button>
+
+                <button onclick="subscribeCameras(500)">
+                    Subscribe 500
+                </button>
+
+                <button onclick="subscribeCameras(100)">
+                    Subscribe 100
+                </button>
+
+                <button onclick="clearCameras()">
+                    Clear
+                </button>
+
+            </div>
+
+            <div class="warning">
+                This tests large camera subscription sets on a
+                single SignalR connection.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- CHANNEL SUBSCRIPTIONS -->
+
+    <div class="card" style="margin-top:16px;">
+
+        <h2>Channel Subscriptions</h2>
+
+        <div class="channel-row">
+
+            <span class="channel-name">
+                Transaction
+            </span>
+
+            <button class="channel"
+                    onclick="subscribeChannel('Transaction', [1,2,3,4,5])">
+                Cameras 1-5
+            </button>
+
+            <span id="transactionStatus"
+                  class="channel-status">
+                Not subscribed
+            </span>
+
+        </div>
+
+
+        <div class="channel-row">
+
+            <span class="channel-name">
+                Alarm
+            </span>
+
+            <button class="channel"
+                    onclick="subscribeChannel('Alarm', [6,7,8,9,10])">
+                Cameras 6-10
+            </button>
+
+            <span id="alarmStatus"
+                  class="channel-status">
+                Not subscribed
+            </span>
+
+        </div>
+
+
+        <div class="channel-row">
+
+            <span class="channel-name">
+                Watchlist
+            </span>
+
+            <button class="channel"
+                    onclick="subscribeChannel('Watchlist', [11,12,13,14,15])">
+                Cameras 11-15
+            </button>
+
+            <span id="watchlistStatus"
+                  class="channel-status">
+                Not subscribed
+            </span>
+
+        </div>
+
+
+        <div class="channel-row">
+
+            <span class="channel-name">
+                Violation
+            </span>
+
+            <button class="channel"
+                    onclick="subscribeChannel('Violation', [16,17,18,19,20])">
+                Cameras 16-20
+            </button>
+
+            <span id="violationStatus"
+                  class="channel-status">
+                Not subscribed
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- EVENT STATISTICS -->
+
+    <div class="card" style="margin-top:16px;">
+
+        <h2>Event Statistics</h2>
+
+        <div class="stats">
+
+            <div class="stat">
+                <div id="totalEvents"
+                     class="stat-value">
+                    0
+                </div>
+
+                <div class="stat-label">
+                    Total Events
+                </div>
+            </div>
+
+
+            <div class="stat">
+                <div id="transactionEvents"
+                     class="stat-value">
+                    0
+                </div>
+
+                <div class="stat-label">
+                    Transaction
+                </div>
+            </div>
+
+
+            <div class="stat">
+                <div id="watchlistEvents"
+                     class="stat-value">
+                    0
+                </div>
+
+                <div class="stat-label">
+                    Watchlist
+                </div>
+            </div>
+
+
+            <div class="stat">
+                <div id="alarmEvents"
+                     class="stat-value">
+                    0
+                </div>
+
+                <div class="stat-label">
+                    Alarm
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- RABBITMQ TEST -->
+
+    <div class="card" style="margin-top:16px;">
+
+        <h2>RabbitMQ / SignalR Verification</h2>
+
+        <p>
+            Publish events from RabbitMQ Management UI.
+            Do not use SignalR test events for this verification.
+        </p>
+
+        <div class="warning">
+
+            Expected architecture:
+
+            <br><br>
+
+            RabbitMQ → Consumer → Dispatcher →
+            Channel + Camera → SignalR
+
+        </div>
+
+    </div>
+
+
+    <!-- EVENT LOG -->
+
+    <div class="card" style="margin-top:16px;">
+
+        <h2>Received Events</h2>
+
+        <div id="events">
+
+            <div class="empty">
+                No events received.
+            </div>
+
+        </div>
+
+        <div class="actions">
+
+            <button onclick="clearEvents()">
+                Clear Events
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        let connection = null;
+
+        const stats = {
+            total: 0,
+            Transaction: 0,
+            Watchlist: 0,
+            Alarm: 0,
+            Violation: 0
+        };
+
+
+        /*
+         * ---------------------------------------------------------
+         * CONNECTION
+         * ---------------------------------------------------------
+         */
+
+        async function connect() {
+
+            if (connection &&
+                connection.state === signalR.HubConnectionState.Connected) {
+
+                return;
+            }
+
+            connection =
+                new signalR.HubConnectionBuilder()
+
+                    .withUrl("/hubs/traffic")
+
+                    .withAutomaticReconnect()
+
+                    .configureLogging(
+                        signalR.LogLevel.Information
+                    )
+
+                    .build();
+
+
+            connection.on(
+                "ReceiveTrafficEvent",
+                handleTrafficEvent
+            );
+
+
+            connection.onreconnecting(() => {
+
+                setStatus(
+                    "Reconnecting...",
+                    "reconnecting"
+                );
+
+            });
+
+
+            connection.onreconnected(
+                connectionId => {
+
+                    setStatus(
+                        "Connected",
+                        "connected"
+                    );
+
+                    document
+                        .getElementById("connectionId")
+                        .innerText =
+                        connectionId || "-";
+
+                }
+            );
+
+
+            connection.onclose(() => {
+
+                setStatus(
+                    "Disconnected",
+                    "disconnected"
+                );
+
+                document
+                    .getElementById("connectionId")
+                    .innerText = "-";
+
+            });
+
+
+            try {
+
+                setStatus(
+                    "Connecting...",
+                    "reconnecting"
+                );
+
+                await connection.start();
+
+
+                setStatus(
+                    "Connected",
+                    "connected"
+                );
+
+
+                document
+                    .getElementById("connectionId")
+                    .innerText =
+                    connection.connectionId;
+
+
+                console.log(
+                    "SignalR connected:",
+                    connection.connectionId
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    "SignalR connection failed:",
+                    error
+                );
+
+                setStatus(
+                    "Connection failed",
+                    "disconnected"
+                );
+
+            }
+
+        }
+
+
+        async function disconnect() {
+
+            if (!connection) {
+                return;
+            }
+
+            try {
+
+                await connection.stop();
+
+            } catch (error) {
+
+                console.error(
+                    "Disconnect failed:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        function setStatus(
+            text,
+            state
+        ) {
+
+            document
+                .getElementById("status")
+                .innerText = text;
+
+
+            const dot =
+                document.getElementById("statusDot");
+
+            dot.className =
+                "dot " + state;
+
+        }
+
+
+        /*
+         * ---------------------------------------------------------
+         * CAMERA SUBSCRIPTIONS
+         * ---------------------------------------------------------
+         */
+
+        async function subscribeCameras(count) {
+
+            if (!isConnected()) {
+                return;
+            }
+
+            const cameraIds =
+                Array.from(
+                    { length: count },
+                    (_, index) => index + 1
+                );
+
+
+            try {
+
+                await connection.invoke(
+                    "UpdateCameras",
+                    cameraIds
+                );
+
+
+                document
+                    .getElementById("cameraCount")
+                    .innerText =
+                    cameraIds.length;
+
+
+                console.log(
+                    "Camera subscription updated:",
+                    cameraIds.length
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "Camera subscription failed:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        async function clearCameras() {
+
+            if (!isConnected()) {
+                return;
+            }
+
+            try {
+
+                await connection.invoke(
+                    "UnsubscribeCameras"
+                );
+
+                document
+                    .getElementById("cameraCount")
+                    .innerText = "0";
+
+
+            } catch (error) {
+
+                console.error(
+                    "Clear cameras failed:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /*
+         * ---------------------------------------------------------
+         * CHANNEL SUBSCRIPTIONS
+         * ---------------------------------------------------------
+         */
+
+        async function subscribeChannel(
+            channel,
+            cameraIds
+        ) {
+
+            if (!isConnected()) {
+                return;
+            }
+
+
+            try {
+
+                await connection.invoke(
+                    "SubscribeChannel",
+                    channel,
+                    cameraIds
+                );
+
+
+                updateChannelStatus(
+                    channel,
+                    cameraIds
+                );
+
+
+                console.log(
+                    `Subscribed ${channel}:`,
+                    cameraIds
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    `Subscribe ${channel} failed:`,
+                    error
+                );
+
+            }
+
+        }
+
+
+        function updateChannelStatus(
+            channel,
+            cameraIds
+        ) {
+
+            const elementId =
+                channel.charAt(0).toLowerCase() +
+                channel.slice(1) +
+                "Status";
+
+
+            const element =
+                document.getElementById(elementId);
+
+
+            if (!element) {
+                return;
+            }
+
+
+            element.innerText =
+                `Subscribed (${cameraIds.length} cameras)`;
+
+        }
+
+
+        /*
+         * ---------------------------------------------------------
+         * RECEIVE EVENTS
+         * ---------------------------------------------------------
+         */
+
+        function handleTrafficEvent(event) {
+
+            console.log(
+                "Traffic Event:",
+                event
+            );
+
+
+            const channel =
+                event.channel ||
+                event.eventType ||
+                "Unknown";
+
+
+            stats.total++;
+
+
+            if (stats[channel] !== undefined) {
+                stats[channel]++;
+            }
+
+
+            updateStatistics();
+
+
+            addEventToLog(
+                event
+            );
+
+        }
+
+
+        function updateStatistics() {
+
+            document
+                .getElementById("totalEvents")
+                .innerText =
+                stats.total;
+
+
+            document
+                .getElementById("transactionEvents")
+                .innerText =
+                stats.Transaction;
+
+
+            document
+                .getElementById("watchlistEvents")
+                .innerText =
+                stats.Watchlist;
+
+
+            document
+                .getElementById("alarmEvents")
+                .innerText =
+                stats.Alarm;
+
+        }
+
+
+        function addEventToLog(event) {
+
+            const container =
+                document.getElementById("events");
+
+
+            const empty =
+                container.querySelector(".empty");
+
+
+            if (empty) {
+                empty.remove();
+            }
+
+
+            const div =
+                document.createElement("div");
+
+            div.className =
+                "event";
+
+
+            const channel =
+                event.channel ||
+                "Unknown";
+
+
+            const camera =
+                event.cameraId ??
+                "-";
+
+
+            const eventType =
+                event.eventType ||
+                "-";
+
+
+            const message =
+                event.message ||
+                "";
+
+
+            const timestamp =
+                event.timestamp
+                    ? new Date(
+                        event.timestamp
+                    ).toLocaleString()
+                    : new Date()
+                        .toLocaleString();
+
+
+            div.innerHTML = `
+
+                <div class="event-header">
+
+                    ${escapeHtml(channel)}
+
+                    |
+                    Camera ${escapeHtml(camera)}
+
+                    |
+                    ${escapeHtml(eventType)}
+
+                </div>
+
+                <div class="event-meta">
+
+                    ${escapeHtml(timestamp)}
+
+                </div>
+
+                <div class="event-message">
+
+                    ${escapeHtml(message)}
+
+                </div>
+            `;
+
+
+            container.prepend(div);
+
+
+            /*
+             * Keep only the latest 200 events
+             * so the test page doesn't become heavy.
+             */
+
+            while (
+                container.children.length > 200
+            ) {
+
+                container.removeChild(
+                    container.lastElementChild
+                );
+
+            }
+
+        }
+
+
+        function clearEvents() {
+
+            document
+                .getElementById("events")
+                .innerHTML = `
+
+                    <div class="empty">
+                        No events received.
+                    </div>
+                `;
+
+
+            stats.total = 0;
+            stats.Transaction = 0;
+            stats.Watchlist = 0;
+            stats.Alarm = 0;
+            stats.Violation = 0;
+
+
+            updateStatistics();
+
+        }
+
+
+        /*
+         * ---------------------------------------------------------
+         * HELPERS
+         * ---------------------------------------------------------
+         */
+
+        function isConnected() {
+
+            if (
+                !connection ||
+                connection.state !==
+                signalR.HubConnectionState.Connected
+            ) {
+
+                alert(
+                    "Connect to SignalR first."
+                );
+
+                return false;
+            }
+
+            return true;
+
+        }
+
+
+        function escapeHtml(value) {
+
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+
+        }
+
+    </script>
+
+</body>
+
+</html>
